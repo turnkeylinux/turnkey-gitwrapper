@@ -1,0 +1,4 @@
+__pycache__
+dist/
+build/
+turnkey_gitwrapper.egg-info/
