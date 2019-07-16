@@ -1,6 +1,6 @@
 # Copyright (c) 2007 Liraz Siri <liraz@turnkeylinux.org>
 #
-# This file is part of turnkey-pylib.
+# This file was part of turnkey-pylib (now defunct).
 #
 # turnkey-pylib is open source software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -15,8 +15,6 @@ from subprocess import PIPE
 
 import subprocess
 import re
-
-from executil import *
 
 def is_git_repository(path):
     """Return True if path is a git repository"""
