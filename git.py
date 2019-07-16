@@ -13,7 +13,7 @@ from os.path import *
 import subprocess
 from subprocess import PIPE
 
-import commands
+import subprocess
 import re
 
 from executil import *
@@ -47,14 +47,14 @@ def setup(method):
                     return arg
 
             if isinstance(arg, (list, tuple)):
-                return map(make_relative, arg)
+                return list(map(make_relative, arg))
 
             try:
                 return self.make_relative(arg)
             except self.Error:
                 return arg
 
-        args = map(make_relative, args)
+        args = list(map(make_relative, args))
 
         try:
             ret = method(self, *args, **kws)
@@ -127,7 +127,7 @@ class Git(object):
         if not bare:
             init_path = join(init_path, ".git")
 
-        command = "git --git-dir %s init" % commands.mkarg(init_path)
+        command = "git --git-dir %s init" % subprocess.mkarg(init_path)
         if not verbose:
             command += " > /dev/null"
 
@@ -165,7 +165,7 @@ class Git(object):
     def _system(self, command, *args):
         try:
             system("git " + command, *args)
-        except ExecError, e:
+        except ExecError as e:
             raise self.Error(e)
 
     def read_tree(self, *opts):
@@ -183,7 +183,7 @@ class Git(object):
     @setup
     def update_index_all(self):
         """update all files that need update according to git update-index --refresh"""
-        err, output = commands.getstatusoutput("git update-index --refresh")
+        err, output = subprocess.getstatusoutput("git update-index --refresh")
         if not err:
             return
         output.split('\n')
@@ -261,14 +261,14 @@ class Git(object):
 
         try:
             self._system(command, *args)
-        except self.Error, e:
+        except self.Error as e:
             return e[0].exitcode
 
     @setup
     def _getoutput(self, command, *args):
         try:
             output = getoutput("git " + command, *args)
-        except ExecError, e:
+        except ExecError as e:
             raise self.Error(e)
         return output
 
@@ -459,7 +459,7 @@ class Git(object):
 
         try:
             output = self._getoutput(command)
-        except self.Error, e:
+        except self.Error as e:
             e = e.args[0]
             if e.output == '':
                 return []
@@ -494,14 +494,14 @@ class Git(object):
         """set alternates path to point to the objects path of the specified git object"""
 
         fh = file(join(self.gitdir, "objects/info/alternates"), "w")
-        print >> fh, join(git.gitdir, "objects")
+        print(join(git.gitdir, "objects"), file=fh)
         fh.close()
 
     @staticmethod
     def set_gitignore(path, lines):
         fh = file(join(path, ".gitignore"), "w")
         for line in lines:
-            print >> fh, line
+            print(line, file=fh)
 
     @staticmethod
     def anchor(path):
