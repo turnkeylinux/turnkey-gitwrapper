@@ -527,6 +527,21 @@ class Git(object):
         print(join(git.gitdir, "objects"), file=fh)
         fh.close()
 
+    def stash(self):
+        msg = self.__getoutput("stash")
+        if msg.startswith('No local changes to save'):
+            return False
+        return msg
+
+    def stash_pop(self):
+        try:
+            msg = self.__getoutput("stash", "pop")
+        except GitError as e:
+            if e.startswith('No stash found'):
+                return False
+            raise
+        return msg
+
     @staticmethod
     def set_gitignore(path, lines, append=False):
         if not isinstancei(lines, (list, tuple)):
