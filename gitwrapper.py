@@ -397,11 +397,17 @@ class Git(object):
         return p.stdout.read().strip()
 
     @setup
-    def log(self, *args):
+    def log(self, *args, oneline=False, count=0):
         """git log *args
         Return stdout pipe"""
+        command = ['log']
+        if oneline:
+            command.append('--oneline')
+        if count != 0:
+            command.append('-{}'.format(count))
+        command = command + list(args)
 
-        return self._getoutput("log", *args, stderr=PIPE)
+        return self._getoutput(*command, stderr=PIPE)
 
     def status(self, *paths):
         """git diff-index --name-status HEAD
@@ -412,6 +418,33 @@ class Git(object):
         if output:
             return [ line.split('\t', 1) for line in output.split('\n')]
         return []
+
+    def status_full(self, simple=True):
+        """git status
+        While simple=True; returns True if clean; False if any uncommitted,
+        unstaged, or untracked files.
+        While simple=False; returns a dictionary of categories, containing
+        lists of files."""
+
+        items = list(filter(
+            None, self._getoutput('status', '--porcelain').split('\n')))
+        if simple:
+            if len(items) == 0:
+                return True
+            return False
+
+        stati = (('uncommited', 'M  '), ('unstaged', ' M '), ('untracked', '?? '))
+        def _check_status(item):
+            for status, prefix in stati:
+                if item.startswith(prefix):
+                    return status, item[len(prefix):]
+            raise GitError('Unrecongnized git status prefix in "{}"'.format(item))
+
+        files_sorted = {'uncomitted': [], 'unstaged': [], 'untracked': []}
+        for item in items:
+            status, filename = _check_status(item)
+            files_sorted[status].append(filename)
+        return files_sorted
 
     def list_unmerged(self):
         output = self._getoutput("diff", "--name-only", "--diff-filter=U")
