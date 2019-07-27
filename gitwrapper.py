@@ -1,8 +1,9 @@
 # Copyright (c) 2007 Liraz Siri <liraz@turnkeylinux.org>
+# Major refactoring 2019; Jeremy Davis <jeremy@turnkeylinux.org>
 #
 # This file was part of turnkey-pylib (now defunct).
 #
-# turnkey-pylib is open source software; you can redistribute it and/or
+# this software is open source software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
 # published by the Free Software Foundation; either version 3 of the
 # License, or (at your option) any later version.
@@ -159,12 +160,15 @@ class Git(object):
         return path[len(self.path):].lstrip("/")
 
     @setup
-    def _system(self, command, *args):
+    def _system(self, command, *args, check_returncode=True):
         output = subprocess.run(
                 ['git', command] + list(args),
                 stderr=PIPE)
-        if output.returncode != 0:
-            raise self.Error(output.stderr.decode('utf-8'))
+        if check_returncode:
+            if output.returncode != 0:
+                raise self.Error(output.stderr.decode('utf-8'))
+        else:
+            return output.returncode
 
     def read_tree(self, *opts):
         """git read-tree *opts"""
@@ -203,7 +207,7 @@ class Git(object):
 
     def checkout_index(self):
         """git checkout-index -a -f"""
-        self._system("checkout-index -a -f")
+        self._system("checkout-index", "-a", "-f")
 
     def update_ref(self, *args):
         """git update-ref [ -d ] <ref> <rev> [ <oldvalue > ]"""
@@ -211,15 +215,15 @@ class Git(object):
 
     def rm_cached(self, path):
         """git rm <path>"""
-        self._system("rm --ignore-unmatch --cached --quiet -f -r", path)
+        self._system("rm", "--ignore-unmatch", "--cached", "--quiet", "-f", "-r", path)
 
     def commit(self, paths=(), msg=None, update_all=False, verbose=False):
         """git commit"""
-        command = "commit"
+        command = ["commit"]
         if update_all:
-            command += " -a"
+            command.append("-a")
         if verbose:
-            command += " -v"
+            command.append("-v")
 
         if msg:
             self._system(command, "-m", msg, *paths)
@@ -236,7 +240,7 @@ class Git(object):
 
     def branch_delete(self, branch):
         """git branch -D <branch>"""
-        self._system("branch -D", branch)
+        self._system("branch", "-D", branch)
 
     def branch(self, *args):
         """git branch *args"""
@@ -259,10 +263,11 @@ class Git(object):
             exit status code if command failed
             None if it was successfuly"""
 
-        try:
-            self._system(command, *args)
-        except self.Error as e:
-            return e[0].exitcode
+        exitcode = self._system(command, *args, check_returncode=False)
+        if exitcode == 0:
+            return None
+        else:
+            return exitcode
 
     @setup
     def _getoutput(self, command, *args, check_returncode=True, stderr=STDOUT):
@@ -345,11 +350,10 @@ class Git(object):
         Note: git describe terminates on the first argument it can't
         describe and we ignore that error.
         """
-        command = ["git", "describe"] + list(args)
-        p = subprocess.Popen(command, stdout=PIPE, stderr=PIPE)
-
-        stdout, stderr = p.communicate()
-        return stdout.splitlines()
+        return self._getoutput(
+                "show", "describe", *args,
+                check_returncode=False, stderr=PIPE
+                ).splitlines()
 
     @setup
     def commit_tree(self, id, log, parents=None):
