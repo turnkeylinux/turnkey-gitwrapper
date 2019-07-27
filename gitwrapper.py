@@ -540,6 +540,5 @@ class Git(object):
 
     @staticmethod
     def anchor(path):
-        fh = file(join(path, ".anchor"), "w")
-        fh.close()
-
+        with open(join(path, ".anchor"), "w") as fob:
+            fob.write('')
