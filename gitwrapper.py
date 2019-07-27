@@ -48,7 +48,7 @@ def setup(method):
 
             try:
                 return self.make_relative(arg)
-            except self.Error:
+            except self.GitError:
                 return arg
 
         args = list(map(make_relative, args))
@@ -71,7 +71,7 @@ class Git(object):
     Most methods that are documented to return values raise an exception on error,
     except if the method is documented to return None on error.
     """
-    Error = GitError
+    GitError = GitError
 
     class MergeMsg(object):
         """Magical attribute.
@@ -127,7 +127,7 @@ class Git(object):
                 ['git', '--git-dir', init_path, 'init'],
                 stdout=PIPE, stderr=STDOUT)
         if command.returncode != 0:
-            raise Error(command.stdout.decode('utf-8'))
+            raise GitError(command.stdout.decode('utf-8'))
         elif verbose:
             print(command.stdout.decode('utf-8'))
 
@@ -148,14 +148,14 @@ class Git(object):
             self.bare = True
             self.gitdir = self.path
         else:
-            raise self.Error("Not a git repository `%s'" % self.path)
+            raise self.GitError("Not a git repository `%s'" % self.path)
 
     def make_relative(self, path):
         path = str(path)
         path = join(realpath(dirname(path)), basename(path))
 
         if not (path == self.path or path.startswith(self.path + "/")):
-            raise self.Error("path not in the git repository (%s)" % path)
+            raise self.GitError("path not in the git repository (%s)" % path)
 
         return path[len(self.path):].lstrip("/")
 
@@ -166,7 +166,7 @@ class Git(object):
                 stderr=PIPE)
         if check_returncode:
             if output.returncode != 0:
-                raise self.Error(output.stderr.decode('utf-8'))
+                raise self.GitError(output.stderr.decode('utf-8'))
         else:
             return output.returncode
 
@@ -276,7 +276,7 @@ class Git(object):
                 stdout=PIPE,
                 stderr=stderr)
         if check_returncode and output.returncode != 0:
-            raise self.Error(output.stdout.decode('utf-8'))
+            raise self.GitError(output.stdout.decode('utf-8'))
 
         return output.stdout.decode('utf-8')
 
@@ -295,7 +295,7 @@ class Git(object):
         """
         try:
             return self._getoutput("rev-parse", *args)
-        except self.Error:
+        except self.GitError:
             return None
 
     def merge_base(self, a, b):
@@ -303,7 +303,7 @@ class Git(object):
         Returns common ancestor"""
         try:
             return self._getoutput("merge-base", a, b)
-        except self.Error:
+        except self.GitError:
             return None
 
     def symbolic_ref(self, name, ref=None):
@@ -336,7 +336,7 @@ class Git(object):
         Returns None on failure"""
         try:
             return self._getoutput("show-ref", ref).split(" ")[1]
-        except self.Error:
+        except self.GitError:
             return None
 
     def show(self, *args):
@@ -376,7 +376,7 @@ class Git(object):
 
         err = p.wait()
         if err:
-            raise self.Error("git commit-tree failed: " + p.stderr.read())
+            raise self.GitError("git commit-tree failed: " + p.stderr.read())
 
         return p.stdout.read().strip()
 
@@ -392,7 +392,7 @@ class Git(object):
 
         err = p.wait()
         if err:
-            raise self.Error("git mktree failed: " + p.stderr.read())
+            raise self.GitError("git mktree failed: " + p.stderr.read())
 
         return p.stdout.read().strip()
 
@@ -449,22 +449,18 @@ class Git(object):
             str = self._getoutput("diff-index --ignore-submodules -r --name-only",
                                   compared[0], *paths)
         else:
-            raise self.Error("compared does not contain 1 or 2 elements")
+            raise self.GitError("compared does not contain 1 or 2 elements")
 
         if str:
             return str.split('\n')
         return []
 
     def list_refs(self, refpath):
-        command = "show-ref --" + refpath
-
         try:
-            output = self._getoutput(command)
-        except self.Error as e:
-            e = e.args[0]
-            if e.output == '':
+            output = self._getoutput("show-ref", "--", refpath)
+        except self.GitError as e:
+            if e == '':
                 return []
-
             raise
 
         tags = []
@@ -499,10 +495,15 @@ class Git(object):
         fh.close()
 
     @staticmethod
-    def set_gitignore(path, lines):
-        fh = file(join(path, ".gitignore"), "w")
-        for line in lines:
-            print(line, file=fh)
+    def set_gitignore(path, lines, append=False):
+        if not isinstancei(lines, (list, tuple)):
+            lines = lines.split('\n')
+        mode = 'w'
+        if append:
+            mode = 'a'
+        with open(join(path, ".gitignore"), mode) as fob:
+            for line in lines:
+                fob.write(line+'\n')
 
     @staticmethod
     def anchor(path):
