@@ -9,11 +9,9 @@
 
 import sys
 import os
-from os.path import *
+from os.path import basename, dirname, exists, isdir, realpath, join, lexists
 import subprocess
-from subprocess import PIPE
-
-import subprocess
+from subprocess import PIPE, STDOUT
 import re
 
 def is_git_repository(path):
@@ -63,9 +61,8 @@ def setup(method):
 
     return wrapper
 
-class Error(Exception):
-    def __str__(self):
-        return str(self.args[0])
+class GitError(Exception):
+    pass
 
 class Git(object):
     """Class for interfacing with a git repository.
@@ -73,7 +70,7 @@ class Git(object):
     Most methods that are documented to return values raise an exception on error,
     except if the method is documented to return None on error.
     """
-    Error = Error
+    Error = GitError
 
     class MergeMsg(object):
         """Magical attribute.
@@ -125,11 +122,13 @@ class Git(object):
         if not bare:
             init_path = join(init_path, ".git")
 
-        command = "git --git-dir %s init" % subprocess.mkarg(init_path)
-        if not verbose:
-            command += " > /dev/null"
-
-        os.system(command)
+        command = subprocess.run(
+                ['git', '--git-dir', init_path, 'init'],
+                stdout=PIPE, stderr=STDOUT)
+        if command.returncode != 0:
+            raise Error(command.stdout.decode('utf-8'))
+        elif verbose:
+            print(command.stdout.decode('utf-8'))
 
         return cls(path)
 
@@ -161,10 +160,11 @@ class Git(object):
 
     @setup
     def _system(self, command, *args):
-        try:
-            system("git " + command, *args)
-        except ExecError as e:
-            raise self.Error(e)
+        output = subprocess.run(
+                ['git', command] + list(args),
+                stderr=PIPE)
+        if output.returncode != 0:
+            raise self.Error(output.stderr.decode('utf-8'))
 
     def read_tree(self, *opts):
         """git read-tree *opts"""
@@ -172,20 +172,22 @@ class Git(object):
 
     def update_index(self, *paths):
         """git update-index --remove <paths>"""
-        self._system("update-index --remove", *paths)
+        self._system("update-index", "--remove", *paths)
 
     def update_index_refresh(self):
         """git update-index --refresh"""
-        self._system("update-index -q --unmerged --refresh")
+        self._system("update-index", "-q", "--unmerged", "--refresh")
 
     @setup
     def update_index_all(self):
         """update all files that need update according to git update-index --refresh"""
-        err, output = subprocess.getstatusoutput("git update-index --refresh")
-        if not err:
+        command = subprocess.run(
+                ['git', 'update-index', '--refresh'],
+                stdout=PIPE,
+                stderr=STDOUT)
+        if command.returncode == 0:
             return
-        output.split('\n')
-
+        output = command.stdout.decode('utf-8')
         files = [ line.rsplit(':', 1)[0] for line in output.split('\n')
                   if line.endswith("needs update") ]
         self.update_index(*files)
@@ -263,12 +265,15 @@ class Git(object):
             return e[0].exitcode
 
     @setup
-    def _getoutput(self, command, *args):
-        try:
-            output = getoutput("git " + command, *args)
-        except ExecError as e:
-            raise self.Error(e)
-        return output
+    def _getoutput(self, command, *args, check_returncode=True, stderr=STDOUT):
+        output = subprocess.run(
+                ['git', command] + list(args),
+                stdout=PIPE,
+                stderr=stderr)
+        if check_returncode and output.returncode != 0:
+            raise self.Error(output.stdout.decode('utf-8'))
+
+        return output.stdout.decode('utf-8')
 
     def cat_file(self, *args):
         return self._getoutput("cat-file", *args)
@@ -392,13 +397,7 @@ class Git(object):
         """git log *args
         Return stdout pipe"""
 
-
-        command = ["git", "log"]
-        command.extend(args)
-
-        p = subprocess.Popen(command, stdout=PIPE, bufsize=1)
-
-        return p.stdout
+        return self._getoutput("log", *args, stderr=PIPE)
 
     def status(self, *paths):
         """git diff-index --name-status HEAD
