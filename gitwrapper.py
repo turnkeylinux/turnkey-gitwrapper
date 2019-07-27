@@ -542,6 +542,21 @@ class Git(object):
             raise
         return msg
 
+    def remote(self, *args, list_all=False):
+        if list_all:
+            result = self.__getoutput("remote", "-v")
+            output = {}
+            for line in result.split('\n').strip():
+                name, location = line.split('\t')
+                if name in output.keys():
+                    output[name].append(location)
+                else:
+                    output[name] = [ location ]
+            return output
+        else:
+            return self.__getoutput("remote", *args)
+
+
     @staticmethod
     def set_gitignore(path, lines, append=False):
         if not isinstancei(lines, (list, tuple)):
