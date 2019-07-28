@@ -15,6 +15,7 @@ import subprocess
 from subprocess import PIPE, STDOUT
 import re
 
+
 def is_git_repository(path):
     """Return True if path is a git repository"""
     try:
@@ -22,6 +23,7 @@ def is_git_repository(path):
         return True
     except GitError:
         return False
+
 
 def setup(method):
     """Decorator that:
@@ -61,14 +63,16 @@ def setup(method):
 
     return wrapper
 
+
 class GitError(Exception):
     pass
+
 
 class Git(object):
     """Class for interfacing with a git repository.
 
-    Most methods that are documented to return values raise an exception on error,
-    except if the method is documented to return None on error.
+    Most methods that are documented to return values raise an exception on
+    error, except if the method is documented to return None on error.
     """
     GitError = GitError
 
@@ -142,8 +146,9 @@ class Git(object):
         if isdir(path_git):
             self.bare = False
             self.gitdir = path_git
-        elif self.path.endswith(".git") and \
-                 isdir(join(self.path, "refs")) and isdir(join(self.path, "objects")):
+        elif (self.path.endswith(".git") and
+              isdir(join(self.path, "refs")) and
+              isdir(join(self.path, "objects"))):
             self.bare = True
             self.gitdir = self.path
         else:
@@ -183,7 +188,8 @@ class Git(object):
 
     @setup
     def update_index_all(self):
-        """update all files that need update according to git update-index --refresh"""
+        """update all files that need update according to git update-index
+        --refresh"""
         command = subprocess.run(
                 ['git', 'update-index', '--refresh'],
                 stdout=PIPE,
@@ -191,8 +197,8 @@ class Git(object):
         if command.returncode == 0:
             return
         output = command.stdout.decode('utf-8')
-        files = [ line.rsplit(':', 1)[0] for line in output.split('\n')
-                  if line.endswith("needs update") ]
+        files = [line.rsplit(':', 1)[0] for line in output.split('\n')
+                 if line.endswith("needs update")]
         self.update_index(*files)
 
     def add(self, *paths):
@@ -214,7 +220,8 @@ class Git(object):
 
     def rm_cached(self, path):
         """git rm <path>"""
-        self._system("rm", "--ignore-unmatch", "--cached", "--quiet", "-f", "-r", path)
+        self._system("rm", "--ignore-unmatch", "--cached",
+                     "--quiet", "-f", "-r", path)
 
     def commit(self, paths=(), msg=None, update_all=False, verbose=False):
         """git commit"""
@@ -361,7 +368,7 @@ class Git(object):
         args = ["git", "commit-tree", id]
         if parents:
             if not isinstance(parents, (list, tuple)):
-                parents = [ parents ]
+                parents = [parents]
 
             for parent in parents:
                 args += ["-p", parent]
@@ -413,9 +420,10 @@ class Git(object):
         Returns array of (status, path) changes """
 
         self.update_index_refresh()
-        output = self._getoutput("diff-index", "--ignore-submodules", "--name-status", "HEAD", *paths)
+        output = self._getoutput("diff-index", "--ignore-submodules",
+                                 "--name-status", "HEAD", *paths)
         if output:
-            return [ line.split('\t', 1) for line in output.split('\n')]
+            return [line.split('\t', 1) for line in output.split('\n')]
         return []
 
     def status_full(self, simple=True):
@@ -432,12 +440,15 @@ class Git(object):
                 return True
             return False
 
-        stati = (('uncommited', 'M  '), ('unstaged', ' M '), ('untracked', '?? '))
+        stati = (('uncommited', 'M  '), ('unstaged', ' M '),
+                 ('untracked', '?? '))
+
         def _check_status(item):
             for status, prefix in stati:
                 if item.startswith(prefix):
                     return status, item[len(prefix):]
-            raise GitError('Unrecongnized git status prefix in "{}"'.format(item))
+            raise GitError(
+                    'Unrecongnized git status prefix in "{}"'.format(item))
 
         files_sorted = {'uncomitted': [], 'unstaged': [], 'untracked': []}
         for item in items:
@@ -467,19 +478,19 @@ class Git(object):
         compared[0] and compared[1] with git diff-tree.
 
         If compared is not a tuple/list, or a tuple/list with 1 element,
-        we compare compared with git diff-index which compares a commit/treeish to
-        the index."""
+        we compare compared with git diff-index which compares a commit/treeish
+        to the index."""
 
         self.update_index_refresh()
         if not isinstance(compared, (list, tuple)):
-            compared = [ compared ]
+            compared = [compared]
 
         if len(compared) == 2:
             str = self._getoutput("diff-tree", "-r", "--name-only",
                                   compared[0], compared[1], *paths)
         elif len(compared) == 1:
-            str = self._getoutput("diff-index", "--ignore-submodules", "-r", "--name-only",
-                                  compared[0], *paths)
+            str = self._getoutput("diff-index", "--ignore-submodules", "-r",
+                                  "--name-only", compared[0], *paths)
         else:
             raise self.GitError("compared does not contain 1 or 2 elements")
 
@@ -520,7 +531,8 @@ class Git(object):
         self.remove_ref("tags/" + name)
 
     def set_alternates(self, git):
-        """set alternates path to point to the objects path of the specified git object"""
+        """set alternates path to point to the objects path of the specified
+        git object"""
 
         fh = file(join(self.gitdir, "objects/info/alternates"), "w")
         print(join(git.gitdir, "objects"), file=fh)
@@ -550,11 +562,10 @@ class Git(object):
                 if name in output.keys():
                     output[name].append(location)
                 else:
-                    output[name] = [ location ]
+                    output[name] = [location]
             return output
         else:
             return self.__getoutput("remote", *args)
-
 
     @staticmethod
     def set_gitignore(path, lines, append=False):
