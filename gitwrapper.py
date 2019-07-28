@@ -17,11 +17,10 @@ import re
 
 def is_git_repository(path):
     """Return True if path is a git repository"""
-
     try:
         git = Git(path)
         return True
-    except:
+    except GitError:
         return False
 
 def setup(method):
