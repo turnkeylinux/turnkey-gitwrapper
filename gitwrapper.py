@@ -321,15 +321,15 @@ class Git(object):
             args.append(ref)
         return self._getoutput(*args)
 
-    def rev_list(self, *args):
+    def rev_list(self, *args, check_returncode=True):
         """git rev-list <commit>.
         Returns list of commits.
         """
-        output = self._getoutput("rev-list", *args)
+        output = self._getoutput("rev-list", *args, check_returncode=check_returncode)
         if not output:
             return []
-
-        return output.split('\n')
+        # remove empty lines from list
+        return list(filter(None, output.split('\n')))
 
     def name_rev(self, rev):
         """git name-rev <rev>
@@ -357,7 +357,7 @@ class Git(object):
         describe and we ignore that error.
         """
         return self._getoutput(
-                "show", "describe", *args,
+                "describe", *args,
                 check_returncode=False, stderr=PIPE
                 ).splitlines()
 
@@ -414,6 +414,26 @@ class Git(object):
         command = command + list(args)
 
         return self._getoutput(*command, stderr=PIPE)
+
+    def get_latest_tag(self) -> str:
+        """git describe --tags $(git rev-list --tags --max-count=1)
+        Returns latest tag. If no tags found, returns False."""
+        # don't check_returncode as it will exit non-zero if no tags
+        latest_tagged_commit = self.rev_list(
+                    '--tags', '--max-count=1', check_returncode=False)
+        if len(latest_tagged_commit) != 1:
+            # should return one result, otherwise there are no tags
+            return False
+        return self.describe('--tags', latest_tagged_commit[0])[0]
+
+    def get_latest_commit(self, short=True) -> str:
+        """git rev-parse [--short] HEAD
+        Returns latest commit short ID by default, long ID if short=False."""
+        args = []
+        if short:
+            args.append('--short')
+        args.append('HEAD')
+        return self.rev_parse(*args).strip()
 
     def status(self, *paths):
         """git diff-index --name-status HEAD
@@ -521,7 +541,7 @@ class Git(object):
         return self.list_refs("heads")
 
     def list_tags(self):
-        return self.list_refs("tags")
+        return self._getoutput("tag").split()
 
     def remove_ref(self, ref):
         """deletes refs/<ref> from the git repository"""
