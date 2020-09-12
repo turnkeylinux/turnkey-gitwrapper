@@ -165,9 +165,9 @@ class Git(object):
 
     @setup
     def _system(self, command, *args, check_returncode=True):
-        output = subprocess.run(
-                ['git', command] + list(args),
-                stderr=PIPE)
+        # command should be a list already, but just in case...
+        command = ['git'] + list(command) + list(args)
+        output = subprocess.run(command, stderr=PIPE)
         if check_returncode:
             if output.returncode != 0:
                 raise self.GitError(output.stderr.decode('utf-8'))
