@@ -10,5 +10,5 @@ setup(
     author_email='jeremy@turnkeylinux.org',
     license='GPLv3+',
     url='https://github.com/JedMeister/turnkey-gitwrapper',
-    py_modules=['gitwrapper',],
+    packages=['gitwrapper',],
 )
