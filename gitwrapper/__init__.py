@@ -589,7 +589,7 @@ class Git(object):
 
     @staticmethod
     def set_gitignore(path, lines, append=False):
-        if not isinstancei(lines, (list, tuple)):
+        if not isinstance(lines, (list, tuple)):
             lines = lines.split('\n')
         mode = 'w'
         if append:
