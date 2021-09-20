@@ -166,7 +166,7 @@ class Git(object):
     @setup
     def _system(self, command, *args, check_returncode=True):
         # command should be a list already, but just in case...
-        command = ['git'] + list(command) + list(args)
+        command = ['git', command, *args]
         output = subprocess.run(command, stderr=PIPE)
         if check_returncode:
             if output.returncode != 0:
@@ -278,13 +278,15 @@ class Git(object):
     @setup
     def _getoutput(self, command, *args, check_returncode=True, stderr=STDOUT):
         output = subprocess.run(
-                ['git', command] + list(args),
+                ['git', command, *args],
                 stdout=PIPE,
                 stderr=stderr)
         if check_returncode and output.returncode != 0:
-            raise self.GitError(output.stdout.decode('utf-8'))
+            raise self.GitError(
+                    output.stdout.decode('utf-8'),
+                    f'erronous input: {command!r} {" ".join(map(repr, args))}')
 
-        return output.stdout.decode('utf-8')
+        return output.stdout.decode('utf-8').rstrip()
 
     def cat_file(self, *args):
         return self._getoutput("cat-file", *args)
@@ -554,9 +556,8 @@ class Git(object):
         """set alternates path to point to the objects path of the specified
         git object"""
 
-        fh = file(join(self.gitdir, "objects/info/alternates"), "w")
-        print(join(git.gitdir, "objects"), file=fh)
-        fh.close()
+        with open(join(self.gitdir, "objects/info/alternates"), "w") as fob:
+            fob.write(join(git.gitdir, "objects") + '\n')
 
     def stash(self):
         msg = self.__getoutput("stash")
@@ -589,7 +590,7 @@ class Git(object):
 
     @staticmethod
     def set_gitignore(path, lines, append=False):
-        if not isinstancei(lines, (list, tuple)):
+        if not isinstance(lines, (list, tuple)):
             lines = lines.split('\n')
         mode = 'w'
         if append:
