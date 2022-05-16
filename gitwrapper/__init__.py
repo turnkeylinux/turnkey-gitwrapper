@@ -13,27 +13,27 @@ import os
 from os.path import basename, dirname, exists, isdir, realpath, join, lexists
 import subprocess
 from subprocess import PIPE, STDOUT
-from typing import (Union, Callable, Any, TypeVar, Optional, List, Tuple, IO,
-    Generic, Type, Dict, no_type_check)
-try:
-    from typing import Protocol
-except ImportError:
-    from typing_extensions import Protocol
+from typing import (Union, Callable, Any, TypeVar, Optional, IO, Generic,
+                    Type, no_type_check, Protocol)
 import contextlib
 import re
 
 AnyPath = Union[os.PathLike, str]
+
+
 def fspath(path: AnyPath) -> str:
     return os.fspath(path)
+
 
 def is_git_repository(path: AnyPath) -> bool:
     """Return True if path is a git repository"""
     path = realpath(fspath(path))
     path_git = join(path, ".git")
     return isdir(path_git) or \
-        (self.path.endswith(".git") and
-        isdir(join(self.path, "refs")) and
-        isdir(join(self.path, "objects")))
+        (path.endswith(".git") and
+         isdir(join(path, "refs")) and
+         isdir(join(path, "objects")))
+
 
 @no_type_check
 def setup(method):
@@ -131,9 +131,11 @@ class Git(object):
     index_lock = IndexLock()
 
     @classmethod
-    def init_create(
-            cls: Type['Git'], path: AnyPath,
-            bare: bool=False, verbose: bool=False) -> 'Git':
+    def init_create(cls: Type['Git'],
+                    path: AnyPath,
+                    bare: bool = False,
+                    verbose: bool = False
+                    ) -> 'Git':
         _path = fspath(path)
         if not lexists(_path):
             os.mkdir(_path)
@@ -180,12 +182,13 @@ class Git(object):
         return path[len(self.path):].lstrip("/")
 
     @setup
-    def _system(self, command: str, *args: str, check_returncode: bool =True) -> int:
+    def _system(self, command: str, *args: str,
+                check_returncode: bool = True) -> int:
         # command should be a list already, but just in case...
-        _command: List[str] = ['git', command, *args]
+        _command: list[str] = ['git', command, *args]
         output = subprocess.run(_command, stderr=PIPE)
         if check_returncode and output.returncode != 0:
-                raise GitError(output.stderr.decode('utf-8'))
+            raise GitError(output.stderr.decode('utf-8'))
         else:
             return output.returncode
 
@@ -240,10 +243,10 @@ class Git(object):
 
     def commit(
             self,
-            paths: Optional[List[str]]=None,
-            msg: Optional[str]=None,
-            update_all: bool=False,
-            verbose: bool=False) -> None:
+            paths: Optional[list[str]] = None,
+            msg: Optional[str] = None,
+            update_all: bool = False,
+            verbose: bool = False) -> None:
         """git commit"""
         if paths is None:
             paths = []
@@ -302,8 +305,8 @@ class Git(object):
             self,
             command: str,
             *args: str,
-            check_returncode: bool=True,
-            stderr: Union[int, IO[str]]=STDOUT) -> str:
+            check_returncode: bool = True,
+            stderr: Union[int, IO[str]] = STDOUT) -> str:
 
         output = subprocess.run(
                 ['git', command, *args],
@@ -343,7 +346,7 @@ class Git(object):
         except GitError:
             return None
 
-    def symbolic_ref(self, name: str, ref: Optional[str]=None) -> str:
+    def symbolic_ref(self, name: str, ref: Optional[str] = None) -> str:
         """git symbolic-ref <name> [ <ref> ]
         Returns the value of the symbolic ref.
         """
@@ -352,11 +355,12 @@ class Git(object):
             args.append(ref)
         return self._getoutput(*args)
 
-    def rev_list(self, *args: str, check_returncode: bool=True) -> List[str]:
+    def rev_list(self, *args: str, check_returncode: bool = True) -> list[str]:
         """git rev-list <commit>.
         Returns list of commits.
         """
-        output = self._getoutput("rev-list", *args, check_returncode=check_returncode)
+        output = self._getoutput("rev-list", *args,
+                                 check_returncode=check_returncode)
         if not output:
             return []
         # remove empty lines from list
@@ -393,9 +397,10 @@ class Git(object):
                 ).splitlines()
 
     @setup
-    def commit_tree(
-            self, id: str, log: str,
-            parents: Optional[Union[List[str], str]]=None) -> str:
+    def commit_tree(self,
+                    id: str, log: str,
+                    parents: Union[list[str], str] = None
+                    ) -> str:
         """git commit-tree <id> [ -p <parents> ] < <log>
         Return id of object committed"""
         args = ["git", "commit-tree", id]
@@ -408,16 +413,17 @@ class Git(object):
 
         p = subprocess.Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         try:
-            p.stdin.write(log)
-            p.stdin.close()
+            # p.stdin: Optional[IO[bytes]]
+            p.stdin.write(log)  # type: ignore
+            p.stdin.close()  # type: ignore
         except IOError:
             pass
 
         err = p.wait()
         if err:
-            raise GitError("git commit-tree failed: " + p.stderr.read())
-
-        return p.stdout.read().strip()
+            raise GitError("git commit-tree failed: {p.stderr.read()!r}")
+        # p.stdout: Optional[IO[bytes]]
+        return p.stdout.read().strip()  # type: ignore
 
     def mktree_empty(self) -> str:
         """return an empty tree id which is needed for some comparisons"""
@@ -425,18 +431,19 @@ class Git(object):
         args = ["git", "mktree"]
         p = subprocess.Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         try:
-            p.stdin.close()
+            # p.stdin: Optional[IO[bytes]]
+            p.stdin.close()  # type: ignore
         except IOError:
             pass
 
         err = p.wait()
         if err:
-            raise GitError("git mktree failed: " + p.stderr.read())
-
-        return p.stdout.read().strip()
+            raise GitError("git mktree failed: {p.stderr.read()!r}")
+        # p.stdout: Optional[IO[bytes]]
+        return p.stdout.read().strip()  # type: ignore
 
     @setup
-    def log(self, *args: str, oneline: bool=False, count: int=0) -> str:
+    def log(self, *args: str, oneline: bool = False, count: int = 0) -> str:
         """git log *args
         Return stdout pipe"""
         command = ['log']
@@ -459,7 +466,7 @@ class Git(object):
             return False
         return self.describe('--tags', latest_tagged_commit[0])[0]
 
-    def get_latest_commit(self, short: bool=True) -> str:
+    def get_latest_commit(self, short: bool = True) -> str:
         """git rev-parse [--short] HEAD
         Returns latest commit short ID by default, long ID if short=False."""
         args = []
@@ -471,7 +478,7 @@ class Git(object):
             raise GitError(f'rev_parse({args}) failed!')
         return out.strip()
 
-    def status(self, *paths: str) -> List[List[str]]:
+    def status(self, *paths: str) -> list[list[str]]:
         """git diff-index --name-status HEAD
         Returns array of (status, path) changes """
 
@@ -482,15 +489,15 @@ class Git(object):
             return [line.split('\t', 1) for line in output.split('\n')]
         return []
 
-    def status_full(self, simple: bool=True) -> Union[
-            bool, Dict[str, List[str]]]:
+    def status_full(self, simple: bool = True) -> Union[
+            bool, dict[str, list[str]]]:
         """git status
         While simple=True; returns True if clean; False if any uncommitted,
         unstaged, or untracked files.
         While simple=False; returns a dictionary of categories, containing
         lists of files."""
 
-        items: List[str] = list(filter(
+        items: list[str] = list(filter(
             None, self._getoutput('status', '--porcelain').split('\n')))
         if simple:
             if len(items) == 0:
@@ -500,20 +507,22 @@ class Git(object):
         stati = (('uncommited', 'M  '), ('unstaged', ' M '),
                  ('untracked', '?? '))
 
-        def _check_status(item: str) -> Tuple[str, str]:
+        def _check_status(item: str) -> tuple[str, str]:
             for status, prefix in stati:
                 if item.startswith(prefix):
                     return status, item[len(prefix):]
             raise GitError(
                     'Unrecongnized git status prefix in "{}"'.format(item))
 
-        files_sorted: Dict[str, List[str]] = {'uncomitted': [], 'unstaged': [], 'untracked': []}
+        files_sorted: dict[str, list[str]] = {'uncomitted': [],
+                                              'unstaged': [],
+                                              'untracked': []}
         for item in items:
             status, filename = _check_status(item)
             files_sorted[status].append(filename)
         return files_sorted
 
-    def list_unmerged(self) -> List[str]:
+    def list_unmerged(self) -> list[str]:
         output = self._getoutput("diff", "--name-only", "--diff-filter=U")
         if output:
             return output.split('\n')
@@ -525,13 +534,13 @@ class Git(object):
         s = self._getoutput("cat-file commit", committish)
         return s[s.index('\n\n') + 2:]
 
-    def ls_files(self, *args: str) -> List[str]:
+    def ls_files(self, *args: str) -> list[str]:
         return self._getoutput("ls-files", *args).splitlines()
 
-    def list_changed_files(
-            self, 
-            compared: Union[Tuple[str, str], Tuple[str], str],
-            *paths: str) -> List[str]:
+    def list_changed_files(self,
+                           compared: Union[tuple[str, str], tuple[str], str],
+                           *paths: str
+                           ) -> list[str]:
         """Return a list of files that changed between compared.
 
         If compared is tuple with 2 elements, we compare the
@@ -543,16 +552,17 @@ class Git(object):
 
         self.update_index_refresh()
         if isinstance(compared, str):
-            _compared = [_compared]
+            # ignored because mypy thinks 'compared' might still be a list...
+            _compared: list[str] = [_compared]  # type: ignore
         else:
             _compared = list(compared)
 
         if len(_compared) == 2:
             s = self._getoutput("diff-tree", "-r", "--name-only",
-                                  _compared[0], _compared[1], *paths)
+                                _compared[0], _compared[1], *paths)
         elif len(_compared) == 1:
             s = self._getoutput("diff-index", "--ignore-submodules", "-r",
-                                  "--name-only", _compared[0], *paths)
+                                "--name-only", _compared[0], *paths)
         else:
             raise GitError("compared does not contain 1 or 2 elements")
 
@@ -560,7 +570,7 @@ class Git(object):
             return s.split('\n')
         return []
 
-    def list_refs(self, refpath: str) -> List[str]:
+    def list_refs(self, refpath: str) -> list[str]:
         try:
             output = self._getoutput("show-ref", "--", refpath)
         except GitError as e:
@@ -579,10 +589,10 @@ class Git(object):
 
         return tags
 
-    def list_heads(self) -> List[str]:
+    def list_heads(self) -> list[str]:
         return self.list_refs("heads")
 
-    def list_tags(self) -> List[str]:
+    def list_tags(self) -> list[str]:
         return self._getoutput("tag").split()
 
     def remove_ref(self, ref: str) -> None:
@@ -614,10 +624,11 @@ class Git(object):
             raise
         return msg
 
-    def remote(self, *args: str, list_all: bool=False) -> Union[str, Dict[str, List[str]]]:
+    def remote(self, *args: str, list_all: bool = False
+               ) -> Union[str, dict[str, list[str]]]:
         if list_all:
             result = self._getoutput("remote", "-v")
-            output: Dict[str, List[str]] = {}
+            output: dict[str, list[str]] = {}
             for line in result.split('\n').strip():
                 name, location = line.split('\t')
                 if name in output.keys():
@@ -629,7 +640,10 @@ class Git(object):
             return self._getoutput("remote", *args)
 
     @staticmethod
-    def set_gitignore(path: str, lines: Union[str, List[str]], append: bool=False) -> None:
+    def set_gitignore(path: str,
+                      lines: Union[str, list[str]],
+                      append: bool = False
+                      ) -> None:
         if isinstance(lines, str):
             lines_ = lines.split('\n')
         else:

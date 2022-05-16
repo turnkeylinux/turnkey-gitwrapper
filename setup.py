@@ -11,4 +11,5 @@ setup(
     license='GPLv3+',
     url='https://github.com/JedMeister/turnkey-gitwrapper',
     packages=['gitwrapper',],
+    package_data={"gitwrapper": ["py.typed"]
 )
