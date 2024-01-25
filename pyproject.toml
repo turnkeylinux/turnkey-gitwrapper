@@ -10,7 +10,7 @@ license = {text = "GPLv3+"}
 description = "Py3 wrapper library for working with git directories"
 
 [project.urls]
-Homepage = "https://github.com/JedMeister/turnkey-gitwrapper"
+Homepage = "https://github.com/turnkeylinux/turnkey-gitwrapper"
 
 [tool.setuptools]
 packages = ["gitwrapper"]
