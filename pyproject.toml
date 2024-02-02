@@ -4,7 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "turnkey-gitwrapper"
-version = "0.12"
 authors = [{name = "TurnKey GNU/Linux", email = "jeremy@turnkeylinux.org"}]
 license = {text = "GPLv3+"}
 description = "Py3 wrapper library for working with git directories"
